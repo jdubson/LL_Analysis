@@ -5,6 +5,7 @@
 library(tidyr)
 library(dplyr)
 library(zoo)
+library(ggplot2)
 
 # Import sample data
 ll_data <- read.csv("~/Desktop/LL_data.csv", header=TRUE, sep=",")
@@ -26,6 +27,7 @@ ll_data_clean <- ll_data_clean %>%
 ll_data_clean$Trial.New <- as.numeric(gsub("Inf", NA, ll_data_clean$Trial.New))
 
 # Summarize into monthly data frame
+# TODO: Fix summary table
 ll_data_monthly <- ll_data_clean
 ll_data_monthly$Month <- as.Date(as.yearmon(ll_data_monthly$Date))
 
@@ -33,3 +35,20 @@ ll_data_monthly_summary <- ll_data_monthly %>%
   group_by(Month) %>%
   summarise(avg_trial_conv = median(Trial.Conversion), tot_trial_new = sum(Trial.New, na.rm = TRUE), tot_trial_adds = sum(Trial.Adds),
             tot_trial_subs = sum(Trial.Subs), tot_paid_adds = sum(Paid.Adds), tot_paid_subs = sum(Paid.Subs), tot_revenue = sum(Revenue))
+
+# Metrics
+
+# Exploratory plot removing the most recent month
+ggplot(ll_data_monthly_summary[-65,], aes(Month, tot_revenue)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+# Monthly product line revenues
+fit <- lm(Month ~ tot_revenue, ll_data_monthly_summary)
+summary(fit)
+
+# Forecast annual run rate by May 2017
+newdata = data.frame(Month = "2017-05-01")
+newdata$Month <- as.Date(newdata$Month)
+run_rate <- predict(fit, newdata, interval="predict")
+run_rate <- run_rate * 12
