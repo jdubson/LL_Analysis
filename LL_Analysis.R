@@ -5,6 +5,18 @@
 library(tidyr)
 library(dplyr)
 
-
 # Import sample data
 ll_data <- read.csv("~/Desktop/LL_data.csv", header=TRUE, sep=",")
+ll_data_clean <- ll_data
+
+# Format data frame
+ll_data_clean$ARPU <- as.numeric(gsub("\\$4.99", 4.99, ll_data_clean$ARPU))
+ll_data_clean$Trial.Conversion <- as.numeric( gsub("\\%", "", ll_data_clean$Trial.Conversion))
+ll_data_clean$Trial.Conversion <- ll_data_clean$Trial.Conversion / 100
+temporary <- as.vector(ll_data_clean$Trial.Adds[-1])
+temporary <- append(temporary,NA)
+ll_data_clean$Trial.Temp <- temporary
+
+ll_data_clean <- ll_data_clean %>%
+  mutate(Revenue = Paid.Subs * ARPU, Trial.New = round(Trial.Temp/Trial.Conversion,0)) %>%
+  select(Date, Trial.Conversion, Trial.New, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Revenue)
