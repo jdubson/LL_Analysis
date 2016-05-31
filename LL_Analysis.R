@@ -16,13 +16,12 @@ ll_data_clean$Date <- as.Date(ll_data_clean$Date, format = "%m/%d/%y")
 ll_data_clean$ARPU <- as.numeric(gsub("\\$4.99", 4.99, ll_data_clean$ARPU))
 ll_data_clean$Trial.Conversion <- as.numeric( gsub("\\%", "", ll_data_clean$Trial.Conversion))
 ll_data_clean$Trial.Conversion <- ll_data_clean$Trial.Conversion / 100
-temporary <- as.vector(ll_data_clean$Trial.Adds[-1])
-temporary <- append(temporary,NA)
-ll_data_clean$Trial.Temp <- temporary
+ll_data_clean$Trial.Temp <- append(ll_data_clean$Trial.Adds[-1],NA)
+ll_data_clean$Total.Paid.Users <- append(ll_data_clean$Paid.Adds[-1],NA) + ll_data_clean$Paid.Subs
 
 ll_data_clean <- ll_data_clean %>%
-  mutate(Revenue = Paid.Subs * ARPU, Trial.New = round(Trial.Temp/Trial.Conversion,0)) %>%
-  select(Date, Trial.Conversion, Trial.New, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Revenue)
+  mutate(Revenue = Paid.Subs * ARPU, Trial.New = round(Trial.Temp/Trial.Conversion,0), Daily.Churn = Total.Users - Paid.Subs) %>%
+  select(Date, Trial.Conversion, Trial.New, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Daily.Churn, Revenue)
 
 ll_data_clean$Trial.New <- as.numeric(gsub("Inf", NA, ll_data_clean$Trial.New))
 
@@ -34,7 +33,9 @@ ll_data_monthly$Month <- as.Date(as.yearmon(ll_data_monthly$Date))
 ll_data_monthly_summary <- ll_data_monthly %>%
   group_by(Month) %>%
   summarise(avg_trial_conv = median(Trial.Conversion), tot_trial_new = sum(Trial.New, na.rm = TRUE), tot_trial_adds = sum(Trial.Adds),
-            tot_trial_subs = sum(Trial.Subs), tot_paid_adds = sum(Paid.Adds), tot_paid_subs = sum(Paid.Subs), tot_revenue = sum(Revenue))
+            f_trial_subs = first(Trial.Subs), l_trial_subs = last(Trial.Subs), f_add = first(Paid.Adds), tot_paid_adds = sum(Paid.Adds), f_paid_subs = first(Paid.Subs), 
+            l_paid_subs = last(Paid.Subs), days = n(), tot_revenue = sum(Revenue)) %>%
+  mutate(net_gain = l_paid_subs - f_paid_subs, total_churn = tot_paid_adds + f_paid_subs - f_add - )
 
 # Metrics
 
@@ -52,3 +53,5 @@ newdata = data.frame(Month = "2017-05-01")
 newdata$Month <- as.Date(newdata$Month)
 run_rate <- predict(fit, newdata, interval="predict")
 run_rate <- run_rate * 12
+
+# Calculate monthly churn rate
