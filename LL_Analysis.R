@@ -27,13 +27,13 @@ ll_data_clean$Trial.Conversion <- ll_data_clean$Trial.Conversion / 100
 # Add new metrics
 #
 #
-ll_data_clean$Total.Paid.Users <- append(ll_data_clean$Paid.Adds[-1],NA) + ll_data_clean$Paid.Subs
+#ll_data_clean$Total.Paid.Users <- append(ll_data_clean$Paid.Subs[-1],NA) + ll_data_clean$Paid.Adds
 
 # Daily Churn Rate
 ll_data_clean <- ll_data_clean %>%
-  mutate(Revenue = Paid.Subs * ARPU, Daily.Churn = Total.Paid.Users - Paid.Subs) %>%
-  select(Date, Trial.Conversion, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Total.Paid.Users, Daily.Churn, ARPU, Revenue) %>%
-  mutate(Daily.Churn.Rate = Daily.Churn / Total.Paid.Users)
+  mutate(Revenue = Paid.Subs * ARPU, Total.Paid.Users = lag(Paid.Subs) + Paid.Adds, 
+         Daily.Churn = Total.Paid.Users - Paid.Subs, Daily.Churn.Rate = Daily.Churn / Total.Paid.Users) %>%
+  select(Date, Trial.Conversion, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Total.Paid.Users, Daily.Churn, Daily.Churn.Rate, ARPU, Revenue)
 
 #ll_data_clean$Trial.New <- as.numeric(gsub("Inf", NA, ll_data_clean$Trial.New))
 
@@ -47,7 +47,8 @@ ll_data_monthly_summary <- ll_data_monthly %>%
   group_by(Month) %>%
   summarise(avg_trial_conv = median(Trial.Conversion), tot_trial_adds = sum(Trial.Adds), f_trial_subs = first(Trial.Subs), 
             l_trial_subs = last(Trial.Subs), tot_paid_adds = sum(Paid.Adds), f_paid_subs = first(Paid.Subs), l_paid_subs = last(Paid.Subs), 
-            days = n(), monthly_churn = mean(Daily.Churn.Rate, na.rm = TRUE), tot_revenue = sum(Revenue), ARPU = first(ARPU))
+            days = n(), tot_revenue = sum(Revenue), ARPU = first(ARPU), tot_churn = sum(Daily.Churn)) %>%
+  mutate(monthly_churn = tot_churn / (tot_paid_adds + lag(l_paid_subs))) %>%
 
 # Part 1
 #
@@ -59,7 +60,7 @@ ggplot(ll_data_monthly_summary[-65,], aes(Month, tot_revenue)) +
   stat_smooth(method = "lm", col = "red")
 
 # Monthly product line revenues model
-fit <- lm(Month ~ tot_revenue, ll_data_monthly_summary)
+fit <- lm(tot_revenue ~ Month, ll_data_monthly_summary[-65,])
 summary(fit)
 
 # Monthly Churn Rate and LTV of a Subscriber
@@ -69,10 +70,22 @@ ll_monthly_metrics <- ll_data_monthly_summary %>%
   mutate(ltv = exp_monthly_lifetime * monthly_arpu) %>%
   select(avg_monthly_churn, avg_monthly_ret, exp_monthly_lifetime, monthly_arpu, ltv)
 
+
+
+# Part 2
+#
+#
+
 # Forecast annual run rate by May 2017
-newdata = data.frame(Month = "2017-05-01")
-newdata$Month <- as.Date(newdata$Month)
-run_rate <- predict(fit, newdata, interval="predict")
-run_rate <- run_rate * 12
+ll_forecast <- read.csv("~/Desktop/LL_forecast.csv", header=TRUE, sep=",")
+ll_forecast$Month <- as.Date(ll_forecast$Month, format = "%m/%d/%y")
+
+rev_forecast <- predict(fit, ll_forecast, interval="predict")
+run_rate <- rev_forecast * 12
+
+# Part 3
+#
+#
+
 
 
