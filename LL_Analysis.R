@@ -80,12 +80,32 @@ ll_monthly_metrics <- ll_data_monthly_summary %>%
 ll_forecast <- read.csv("~/Desktop/LL_forecast.csv", header=TRUE, sep=",")
 ll_forecast$Month <- as.Date(ll_forecast$Month, format = "%m/%d/%y")
 
-rev_forecast <- predict(fit, ll_forecast, interval="predict")
+rev_forecast <- predict(fit, ll_forecast)
 run_rate <- rev_forecast * 12
 
 # Part 3
 #
 #
 
+fit_churn <- lm(monthly_churn ~ Month, ll_data_monthly_summary[-65,])
+churn_forecast <- predict(fit_churn, ll_forecast)
+
+fit_adds <- lm(tot_trial_adds ~ Month, ll_data_monthly_summary[-65,])
+adds_forecast <- predict(fit_adds, ll_forecast)
+
+fit_conv <- lm(avg_trial_conv ~ Month, ll_data_monthly_summary[-65,])
+conv_forecast <- predict(fit_conv, ll_forecast)
+
+forecast <- cbind(ll_forecast, churn_forecast, adds_forecast, conv_forecast)
+
+impact_forecast <- forecast %>%
+  mutate(new_paid_adds = adds_forecast * conv_forecast, new_paid_sub = new_paid_adds * (1-churn_forecast), new_rev = new_paid_sub * 149.7,
+         adds_rev_change = ((adds_forecast*1.1 * conv_forecast) * (1-churn_forecast) * 149.7) - new_rev, 
+         churn_rev_change = ((adds_forecast * conv_forecast) * (1-(churn_forecast-(churn_forecast*0.1))) * 149.7) - new_rev,
+         conv_rev_change = ((adds_forecast * conv_forecast*1.1) * (1-churn_forecast) * 149.7) - new_rev)
+
+# Part 4
+#
+#
 
 
