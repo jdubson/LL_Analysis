@@ -32,7 +32,7 @@ ll_data_clean$Total.Paid.Users <- append(ll_data_clean$Paid.Adds[-1],NA) + ll_da
 # Daily Churn Rate
 ll_data_clean <- ll_data_clean %>%
   mutate(Revenue = Paid.Subs * ARPU, Daily.Churn = Total.Paid.Users - Paid.Subs) %>%
-  select(Date, Trial.Conversion, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Total.Paid.Users, Daily.Churn, Revenue) %>%
+  select(Date, Trial.Conversion, Trial.Adds, Trial.Subs, Paid.Adds, Paid.Subs, Total.Paid.Users, Daily.Churn, ARPU, Revenue) %>%
   mutate(Daily.Churn.Rate = Daily.Churn / Total.Paid.Users)
 
 #ll_data_clean$Trial.New <- as.numeric(gsub("Inf", NA, ll_data_clean$Trial.New))
@@ -45,20 +45,29 @@ ll_data_monthly$Month <- as.Date(as.yearmon(ll_data_monthly$Date))
 
 ll_data_monthly_summary <- ll_data_monthly %>%
   group_by(Month) %>%
-  summarise(avg_trial_conv = median(Trial.Conversion), tot_trial_adds = sum(Trial.Adds),
-            f_trial_subs = first(Trial.Subs), l_trial_subs = last(Trial.Subs), tot_paid_adds = sum(Paid.Adds), f_paid_subs = first(Paid.Subs), 
-            l_paid_subs = last(Paid.Subs), days = n(), monthly_churn = mean(Daily.Churn.Rate), tot_revenue = sum(Revenue))
+  summarise(avg_trial_conv = median(Trial.Conversion), tot_trial_adds = sum(Trial.Adds), f_trial_subs = first(Trial.Subs), 
+            l_trial_subs = last(Trial.Subs), tot_paid_adds = sum(Paid.Adds), f_paid_subs = first(Paid.Subs), l_paid_subs = last(Paid.Subs), 
+            days = n(), monthly_churn = mean(Daily.Churn.Rate, na.rm = TRUE), tot_revenue = sum(Revenue), ARPU = first(ARPU))
 
-# Metrics
+# Part 1
+#
+#
 
 # Exploratory plot removing the most recent month
 ggplot(ll_data_monthly_summary[-65,], aes(Month, tot_revenue)) +
   geom_point() +
   stat_smooth(method = "lm", col = "red")
 
-# Monthly product line revenues
+# Monthly product line revenues model
 fit <- lm(Month ~ tot_revenue, ll_data_monthly_summary)
 summary(fit)
+
+# Monthly Churn Rate and LTV of a Subscriber
+ll_monthly_metrics <- ll_data_monthly_summary %>%
+  summarise(avg_monthly_churn = mean(na.omit(monthly_churn)), arpu = first(ARPU)) %>%
+  mutate(avg_monthly_ret = 1 - avg_monthly_churn, exp_monthly_lifetime = 1 / avg_monthly_churn, monthly_arpu = arpu * 30) %>%
+  mutate(ltv = exp_monthly_lifetime * monthly_arpu) %>%
+  select(avg_monthly_churn, avg_monthly_ret, exp_monthly_lifetime, monthly_arpu, ltv)
 
 # Forecast annual run rate by May 2017
 newdata = data.frame(Month = "2017-05-01")
