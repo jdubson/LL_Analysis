@@ -96,16 +96,34 @@ adds_forecast <- predict(fit_adds, ll_forecast)
 fit_conv <- lm(avg_trial_conv ~ Month, ll_data_monthly_summary[-65,])
 conv_forecast <- predict(fit_conv, ll_forecast)
 
-forecast <- cbind(ll_forecast, churn_forecast, adds_forecast, conv_forecast)
+fit_paid_subs <- lm(l_paid_subs ~ Month, ll_data_monthly_summary[-65,])
+paid_subs_forecast <- predict(fit_paid_subs, ll_forecast)
+
+forecast <- cbind(ll_forecast, churn_forecast, adds_forecast, conv_forecast, paid_subs_forecast)
 
 impact_forecast <- forecast %>%
   mutate(new_paid_adds = adds_forecast * conv_forecast, new_paid_sub = new_paid_adds * (1-churn_forecast), new_rev = new_paid_sub * 149.7,
          adds_rev_change = ((adds_forecast*1.1 * conv_forecast) * (1-churn_forecast) * 149.7) - new_rev, 
          churn_rev_change = ((adds_forecast * conv_forecast) * (1-(churn_forecast-(churn_forecast*0.1))) * 149.7) - new_rev,
-         conv_rev_change = ((adds_forecast * conv_forecast*1.1) * (1-churn_forecast) * 149.7) - new_rev)
+         conv_rev_change = ((adds_forecast * conv_forecast*1.1) * (1-churn_forecast) * 149.7) - new_rev,
+         ret_rev = (1-churn_forecast) * paid_subs_forecast * 149.7,
+         new_ret_rev = (1-(churn_forecast-(churn_forecast*0.1))) * paid_subs_forecast * 149.7,
+         churn_value = new_ret_rev - ret_rev + churn_rev_change)
 
 # Part 4
 #
 #
 
+fixed_cost <- rep(60000, times = 13)
 
+forecast <- cbind(ll_forecast, churn_forecast, adds_forecast, conv_forecast, fixed_cost)
+
+project_forecast <- forecast %>%
+  mutate(new_paid_adds = adds_forecast * conv_forecast, new_paid_sub = new_paid_adds * (1-churn_forecast), new_rev = new_paid_sub * 149.7,
+         adds_rev_change = ((adds_forecast*1.0591 * conv_forecast) * (1-churn_forecast) * 149.7) - new_rev, 
+         churn_rev_change = ((adds_forecast * conv_forecast) * (1-(churn_forecast-(churn_forecast*0.0607))) * 149.7) - new_rev,
+         conv_rev_change = ((adds_forecast * conv_forecast*1.0591) * (1-churn_forecast) * 149.7) - new_rev,
+         ret_rev = (1-churn_forecast) * paid_subs_forecast * 149.7,
+         new_ret_rev = (1-(churn_forecast-(churn_forecast*0.0607))) * paid_subs_forecast * 149.7,
+         churn_value = new_ret_rev - ret_rev + churn_rev_change) %>%
+  summarise(adds_tot = sum(adds_rev_change), churn_value = sum(churn_value), conv_tot = sum(conv_rev_change), tot_fixed_cost = sum(fixed_cost))
